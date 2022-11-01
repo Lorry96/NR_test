@@ -1,0 +1,711 @@
+[{
+        "id": "507d49d0.5eaa08",
+        "type": "tab",
+        "label": "S7_GEN_MACHINE_GEN_DEVICE_500_Read_flow",
+        "disabled": false,
+        "info": ""
+    }, {
+        "id": "ce8f9c78-a47d-44cb-bce5-38590a18653b",
+        "type": "status",
+        "z": "507d49d0.5eaa08",
+        "name": "Node_Status",
+        "scope": ["3128879a-03a0-423c-a054-93fecfb96748"],
+        "x": 90,
+        "y": 180,
+        "wires": [["ae24de32-61e3-45fb-88b4-58ee58213e44"]]
+    }, {
+        "id": "63709345-51c7-46d5-bb41-aa6316977834",
+        "type": "catch",
+        "z": "507d49d0.5eaa08",
+        "name": "Catch_Error",
+        "scope": null,
+        "uncaught": false,
+        "x": 90,
+        "y": 140,
+        "wires": [["f30ebaef-6769-4939-b790-7853852cb415"]]
+    }, {
+        "id": "3128879a-03a0-423c-a054-93fecfb96748",
+        "type": "s7 in",
+        "z": "507d49d0.5eaa08",
+        "endpoint": "f2ad0711-3709-4990-a9ba-1b69c5fd2b4c",
+        "mode": "all",
+        "variable": "",
+        "diff": false,
+        "name": "PLC_EDGE_200MS_Read",
+        "x": 130,
+        "y": 60,
+        "wires": [["2d92c1af-5d8a-41ef-a2b7-1e052a35f1d3"]]
+    }, {
+        "id": "64ae8ade-496d-4558-9699-ea9390e90408",
+        "type": "function",
+        "z": "507d49d0.5eaa08",
+        "name": "Scaling_Value",
+        "func": "var plc_data = msg.payload; //data received from PLC\nvar params = msg.params;\nvar scaling_values = params.scaling_values;\nvar types = params.TagTable.Type;\nmsg1 = {};\nObject.keys(scaling_values).forEach(function(variable) {\n            //var_name = plc_data[variable].nodeId.name;\n            if(types[variable] !== \"string\"){\n                scaling_values[variable] *= plc_data[variable];\n            }else {\n                scaling_values[variable] = plc_data[variable];\n            }\n});\n            \nmsg1.payload = scaling_values;\nmsg.payload= {\n               scaling_values:scaling_values,\n               params : params\n               }\ndelete msg._session;\nreturn [msg1,msg];\n",
+        "outputs": 2,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "x": 540,
+        "y": 60,
+        "wires": [["a04ebc61-1c02-4a77-bab2-ea03a3192635"], ["2da362e8-5e2c-4db2-85fd-986fcfadb2c6"]]
+    }, {
+        "id": "f30ebaef-6769-4939-b790-7853852cb415",
+        "type": "rbe",
+        "z": "507d49d0.5eaa08",
+        "name": "New error ?",
+        "func": "rbe",
+        "gap": "",
+        "start": "",
+        "inout": "out",
+        "property": "error.source.type",
+        "x": 250,
+        "y": 140,
+        "wires": [["02575292-e9cb-411d-ac9a-36f5878be37b"]]
+    }, {
+        "id": "ae24de32-61e3-45fb-88b4-58ee58213e44",
+        "type": "function",
+        "z": "507d49d0.5eaa08",
+        "name": "sortAlerts",
+        "func": "/**\n * this function returns 0 if 1 is given and the opposite\n */\nfunction other(i){\n    if(i===0) return 1;\n    else return 0;\n}\n\nalertFilter=context.get('alertFilter')||{alertArray : ['',''], i : 0, status : '', cycle : false};\nalertFilter.status=msg.status.text;\n\nif (alertFilter.status===alertFilter.alertArray[other(alertFilter.i)]){           //test if the last status is the same\n    return;\n}\n\nelse {\n    if (alertFilter.status===alertFilter.alertArray[alertFilter.i]){              //test if the pre-last status is the same\n        if (alertFilter.cycle) return;\n        else {\n            alertFilter.cycle=true;\n            flow.set('alertFilter',alertFilter);\n            return msg;\n        }\n    }\n    \nelse {\n    alertFilter.cycle=false;\n    alertFilter.alertArray[alertFilter.i]=alertFilter.status;\n    alertFilter.i=other(alertFilter.i);\n    context.set('alertFilter',alertFilter);\n    return msg;\n    }\n}",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "x": 260,
+        "y": 180,
+        "wires": [["fdd12163-a039-4a55-8f82-2ae4c642109a"]]
+    }, {
+        "id": "6ddacefa-93be-43f0-a6f6-47132f53b650",
+        "type": "function",
+        "z": "507d49d0.5eaa08",
+        "name": "Prepare Status",
+        "func": "var message_time = new Date().toLocaleString();\nvar msg_criticity = \"\";\n\nif(msg.status.text==\"online\"){\n    msg_criticity=\"0\";\n}else if(msg.status.text==\"connecting\"){\n    msg_criticity=\"10\";\n}else if(msg.status.text==\"badvalues\"){\n    msg_criticity=\"20\";\n}else if(msg.status.text==\"offline\" || msg.status.text==\"unknown\"){\n    msg_criticity=\"30\";\n}else{\n    msg_criticity=\"30\";\n}\n\nmsg.payload = {\"_msgid\":msg._msgid,\"message_plant\":msg.message_plant,\"message_machine\":msg.message_machine,\"message_class\":\"Status\",\"message_source\":msg.message_source,\n\"message_node\":msg.status.source.name,\"message_time\":message_time,\"message_criticity\":msg_criticity,\"message_text\":msg.status.text};\n\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "x": 620,
+        "y": 180,
+        "wires": [["6c8bcb38-8468-413c-acdf-eeacd073a61a", "4c591df0-a6d2-4ce0-b641-f5970fd97fad", "0939d034-7d51-4ede-a8dd-7b0ce37d976c"]]
+    }, {
+        "id": "b5e65d00-a10b-4815-b313-7fd6168ae1bf",
+        "type": "function",
+        "z": "507d49d0.5eaa08",
+        "name": "Prepare Error",
+        "func": "var message_time = new Date();\n\nmsg.payload = {\"_msgid\":msg._msgid,\"message_plant\":msg.message_plant,\"message_machine\":msg.message_machine,\"message_class\":\"Error\",\"message_source\":msg.message_source,\n\"message_node\":msg.error.source.name,\"message_time\":message_time,\"message_criticity\":\"30\",\"message_text\":msg.error.message};\n\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "x": 620,
+        "y": 140,
+        "wires": [["6c8bcb38-8468-413c-acdf-eeacd073a61a", "4c591df0-a6d2-4ce0-b641-f5970fd97fad"]]
+    }, {
+        "id": "2da362e8-5e2c-4db2-85fd-986fcfadb2c6",
+        "type": "function",
+        "z": "507d49d0.5eaa08",
+        "name": "Prepare data storage",
+        "func": "var plc_data = msg.payload.scaling_values; //data received from PLC\nvar params = msg.payload.params;\nvar texttosend = [];\n//------------------------------------------------------------//\n\n//convert plc_data with scaling value \nObject.keys(plc_data).forEach(function(variable) {\n            //var_name = plc_data[variable].nodeId.name;\n            var_name = variable;\n           //check if you want save data into database\n            if (params.write_to_db[var_name] === 0) {\n                delete plc_data[variable];\n            }\n            \n            //write data in an object array\n            else{\n                \n            texttosend.push([{\n                                //[var_name] : plc_data[variable].value\n                                [var_name] : plc_data[variable]\n                                \n                            },\n                            {\n                               Name : params.TagTable.Name[var_name],\n                                Type : params.TagTable.Type[var_name],\n                                Module: params.TagTable.Module[var_name],\n                                Custom: params.TagTable.Custom[var_name]\n                            }]\n                        )\n            }\n\n})\n\nmsg.payload = texttosend;\nreturn msg;\n\n",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "x": 760,
+        "y": 80,
+        "wires": [["d8e4c909-3622-453a-8fd8-277551840664"]]
+    }, {
+        "id": "a04ebc61-1c02-4a77-bab2-ea03a3192635",
+        "type": "json",
+        "z": "507d49d0.5eaa08",
+        "name": "Format to JSON",
+        "property": "payload",
+        "action": "",
+        "pretty": false,
+        "x": 740,
+        "y": 40,
+        "wires": [["21418546-f3b1-4bd9-84c9-8daaff4515a7"]]
+    }, {
+        "id": "21418546-f3b1-4bd9-84c9-8daaff4515a7",
+        "type": "tcp out",
+        "z": "507d49d0.5eaa08",
+        "host": "10.171.17.237",
+        "port": "1973",
+        "beserver": "server",
+        "base64": false,
+        "end": false,
+        "name": "S7_RawData_TCPexport",
+        "x": 1010,
+        "y": 40,
+        "wires": []
+    }, {
+        "id": "d8e4c909-3622-453a-8fd8-277551840664",
+        "type": "influxdb out",
+        "z": "507d49d0.5eaa08",
+        "influxdb": "4aea4161-3e40-4ec2-a883-312617e48f75",
+        "name": "S7_MODELE",
+        "measurement": "METRICS",
+        "precision": "",
+        "retentionPolicy": "retention",
+        "database": "",
+        "retentionPolicyV18Flux": "",
+        "org": "",
+        "bucket": "",
+        "x": 980,
+        "y": 80,
+        "wires": []
+    }, {
+        "id": "4c591df0-a6d2-4ce0-b641-f5970fd97fad",
+        "type": "json",
+        "z": "507d49d0.5eaa08",
+        "name": "Format to JSON",
+        "property": "payload",
+        "action": "",
+        "pretty": true,
+        "x": 800,
+        "y": 140,
+        "wires": [["c6a5551e-a996-4ba1-ad0b-43d4523ce07b"]]
+    }, {
+        "id": "6c8bcb38-8468-413c-acdf-eeacd073a61a",
+        "type": "function",
+        "z": "507d49d0.5eaa08",
+        "name": "Prepare local alert",
+        "func": "msg.payload = [{    \n    Message: msg.payload.message_text},\n{\n    Class : msg.payload.message_class,\n    Source: msg.payload.message_source,\n    Node: msg.payload.message_node,\n    Level: msg.payload.message_criticity\n}];\n                            \nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "x": 810,
+        "y": 180,
+        "wires": [["f564341c-19a8-431b-881b-71866ae215a8"]]
+    }, {
+        "id": "f564341c-19a8-431b-881b-71866ae215a8",
+        "type": "influxdb out",
+        "z": "507d49d0.5eaa08",
+        "influxdb": "4aea4161-3e40-4ec2-a883-312617e48f75",
+        "name": "S7_LOG",
+        "measurement": "ALERT_LOG",
+        "precision": "",
+        "retentionPolicy": "retention",
+        "database": "",
+        "retentionPolicyV18Flux": "",
+        "org": "",
+        "bucket": "",
+        "x": 980,
+        "y": 180,
+        "wires": []
+    }, {
+        "id": "c6a5551e-a996-4ba1-ad0b-43d4523ce07b",
+        "type": "http request",
+        "z": "507d49d0.5eaa08",
+        "name": "MHM api post",
+        "method": "POST",
+        "ret": "txt",
+        "paytoqs": "ignore",
+        "url": "https://mhm-qual.corp.ponet/MHM/ws/api/alerts",
+        "tls": "ef39b40c.ed7218",
+        "persist": false,
+        "proxy": "",
+        "authType": "",
+        "x": 1000,
+        "y": 140,
+        "wires": [[]]
+    }, {
+        "id": "ed5c6078-78b8-41ab-9c3d-3c2cb5707506",
+        "type": "npm",
+        "z": "507d49d0.5eaa08",
+        "name": "notification SMS",
+        "func": "function sendSMS(){\n    return send.message\n        .sms()\n        .from('PO_CES_EDGE')\n        .to(msg.sms_number)\n        .message(msg.sms_message)\n        .execute();\n}\nvar send = new npm_module();\nsend.authentication\n.loginHashed('kevin.joest@plasticomnium.com', '50fe8f4b28ac829d9db7b6eecfb26f8d')\n.then(sendSMS);\nreturn {payload:'Sms Sent'};",
+        "npm_module": "smsapicom",
+        "module_style": "custom",
+        "msg_payload": "return_val",
+        "function_name": "",
+        "x": 940,
+        "y": 280,
+        "wires": [[]]
+    }, {
+        "id": "796c7125-ab4f-41a1-b2b6-32c172cd53a1",
+        "type": "e-mail",
+        "z": "507d49d0.5eaa08",
+        "server": "smtp.corp.ponet",
+        "port": "25",
+        "secure": false,
+        "tls": false,
+        "name": "",
+        "dname": "notification EMAIL",
+        "x": 930,
+        "y": 320,
+        "wires": []
+    }, {
+        "id": "5bf5a433-0f2a-4040-bf53-3af93686f905",
+        "type": "http request",
+        "z": "507d49d0.5eaa08",
+        "name": "notification MHM",
+        "method": "POST",
+        "ret": "txt",
+        "paytoqs": "ignore",
+        "url": "https://mhm-qual.corp.ponet/MHM/ws/api/alerts",
+        "tls": "ef39b40c.ed7218",
+        "persist": false,
+        "proxy": "",
+        "authType": "",
+        "x": 930,
+        "y": 400,
+        "wires": [[]]
+    }, {
+        "id": "be1b8665-762d-40b1-818b-ce8c5e706c0a",
+        "type": "function",
+        "z": "507d49d0.5eaa08",
+        "name": "Prepare local Notif",
+        "func": "msg.payload = [{    \n    Message: msg.payload.message_text},\n{\n    Class : msg.payload.message_class,\n    Source: msg.payload.message_source,\n    Node: msg.payload.message_node,\n    Level: msg.payload.message_criticity\n}];\n                            \nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "x": 550,
+        "y": 440,
+        "wires": [["f564341c-19a8-431b-881b-71866ae215a8"]]
+    }, {
+        "id": "7d550880-d1fb-47d1-9285-490745462e5c",
+        "type": "function",
+        "z": "507d49d0.5eaa08",
+        "name": "Prepare MHM",
+        "func": "var message_time = new Date();\n\nmsg.payload = {\"_msgid\":msg._msgid,\"message_plant\":msg.payload.message_plant,\"message_machine\":msg.payload.message_machine,\"message_class\":\"Status\",\"message_source\":\"S7_MODELE\",\n\"message_node\":msg.status.source.name,\"message_time\":message_time,\"message_criticity\":msg.payload.message_criticity,\"message_text\":msg.status.text};\n\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "x": 540,
+        "y": 400,
+        "wires": [["c72af119-5645-4e9e-8385-240d6fb8a56a"]]
+    }, {
+        "id": "c72af119-5645-4e9e-8385-240d6fb8a56a",
+        "type": "json",
+        "z": "507d49d0.5eaa08",
+        "name": "",
+        "property": "payload",
+        "action": "",
+        "pretty": true,
+        "x": 710,
+        "y": 400,
+        "wires": [["5bf5a433-0f2a-4040-bf53-3af93686f905"]]
+    }, {
+        "id": "cb902126-2f69-4183-962e-2b432e7e76fd",
+        "type": "function",
+        "z": "507d49d0.5eaa08",
+        "name": "prepareEmail",
+        "func": "var topic=\"MHM - Data collection status on machine \"+msg.payload.message_machine;\nfunction arrayToStr(top,arr){           //this function returns a str from a list, with each element formated to a HTML mail form.\n    var res=\"\";\n    arr.forEach(i => res=res+'<tr><th style=\"padding-top: 12px; padding-bottom: 12px; text-align: left; background-color: #f2f2f2; border: 1px solid #ddd; padding: 8px;\">'+top+\"</th>\" +i+'</tr>');\n    return res;\n}\n\n\n\nvar dico = flow.get(\"mailDictio\") || {};\nflow.set(\"mailDictio\",{}); //empty the flow dictionnary so msgs wont be sent multiple times\nkeys=Object.keys(dico);\nvar mail=[];\nvar formatedMail = \"\";\nkeys.forEach(element => mail.push([element,dico[element]]));   //mail is no a list of [topic,[msg1,...,msgN]]\nmail.forEach(element => formatedMail=formatedMail+'<table style=\"  font-family: Arial, Helvetica, sans-serif; border-collapse: collapse; width: 100%;\"><tr><th style=\"padding-top: 12px; padding-bottom: 12px; text-align: left; background-color: #0f3d99; color: white; border: 1px solid #ddd; padding: 8px;\">Topic: </th><th style=\"padding-top: 12px; padding-bottom: 12px; text-align: left; background-color: #0f3d99; color: white; border: 1px solid #ddd; padding: 8px;\">Message(s): </th></tr>'+arrayToStr(element[0],element[1]) +'</table><br><br>');    //format each topic in a tab form with all the messages\nformatedMail=formatedMail+'Link to the monitoring dashboard: '+msg.teams_grafana;\n\nmsg.payload=formatedMail;   //payload is now the finished mail\nmsg.from = 'edge.compiegne@plasticomnium.com';\nmsg.topic = topic;\nmsg.to = msg.email_address;\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "x": 530,
+        "y": 320,
+        "wires": [["796c7125-ab4f-41a1-b2b6-32c172cd53a1"]]
+    }, {
+        "id": "8935b405-1ac8-42d1-869a-a4c9afe09ac9",
+        "type": "function",
+        "z": "507d49d0.5eaa08",
+        "name": "prepare sms",
+        "func": "var dico = flow.get(\"smsDictio\") || {};  //get and then reset te dictionnary\nflow.set(\"smsDictio\",{});\n\nkeys=Object.keys(dico);\nvar sms=[];\nvar formatedSMS = msg.payload.message_machine+\" has raised these alerts:\\n\\n\";  //head of the message\nkeys.forEach(element => sms.push([element,dico[element]]));\nsms.forEach(element => formatedSMS=formatedSMS+''+element[0]+': '+element[1]+' messages\\n\\n'); //concatenates the messages in one SMS\nformatedSMS=formatedSMS+'Check grafana for more info'        //tail of the message\nmsg.sms_message=formatedSMS;\nmsg.sms=sms;\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "x": 530,
+        "y": 280,
+        "wires": [["ed5c6078-78b8-41ab-9c3d-3c2cb5707506"]]
+    }, {
+        "id": "363bc492-e6a2-4afe-99fa-46b36d55e912",
+        "type": "delay",
+        "z": "507d49d0.5eaa08",
+        "name": "sms frequency",
+        "pauseType": "rate",
+        "timeout": "5",
+        "timeoutUnits": "seconds",
+        "rate": "1",
+        "nbRateUnits": 5,
+        "rateUnits": "minute",
+        "randomFirst": "1",
+        "randomLast": "5",
+        "randomUnits": "seconds",
+        "drop": true,
+        "x": 340,
+        "y": 280,
+        "wires": [["8935b405-1ac8-42d1-869a-a4c9afe09ac9"]]
+    }, {
+        "id": "169ca425-c81e-4114-bd2e-4afcabb87396",
+        "type": "delay",
+        "z": "507d49d0.5eaa08",
+        "name": "email frequency",
+        "pauseType": "rate",
+        "timeout": "5",
+        "timeoutUnits": "seconds",
+        "rate": "1",
+        "nbRateUnits": 5,
+        "rateUnits": "minute",
+        "randomFirst": "1",
+        "randomLast": "5",
+        "randomUnits": "seconds",
+        "drop": true,
+        "x": 340,
+        "y": 320,
+        "wires": [["cb902126-2f69-4183-962e-2b432e7e76fd"]]
+    }, {
+        "id": "f7d7ef37-7893-4549-a306-6c92f30cda42",
+        "type": "delay",
+        "z": "507d49d0.5eaa08",
+        "name": "MHM frequency",
+        "pauseType": "timed",
+        "timeout": "5",
+        "timeoutUnits": "seconds",
+        "rate": "1",
+        "nbRateUnits": "1",
+        "rateUnits": "minute",
+        "randomFirst": "1",
+        "randomLast": "5",
+        "randomUnits": "seconds",
+        "drop": true,
+        "x": 340,
+        "y": 400,
+        "wires": [["7d550880-d1fb-47d1-9285-490745462e5c"]]
+    }, {
+        "id": "4ecdc15c-5287-45d8-89f1-f9a563d78d60",
+        "type": "switch",
+        "z": "507d49d0.5eaa08",
+        "name": "email ?",
+        "property": "email",
+        "propertyType": "msg",
+        "rules": [{
+                "t": "true"
+            }
+        ],
+        "checkall": "true",
+        "repair": false,
+        "outputs": 1,
+        "x": 160,
+        "y": 320,
+        "wires": [["169ca425-c81e-4114-bd2e-4afcabb87396"]]
+    }, {
+        "id": "9e52cd7c-7690-45bc-9c94-e8f59f94c81f",
+        "type": "switch",
+        "z": "507d49d0.5eaa08",
+        "name": "sms ?",
+        "property": "sms",
+        "propertyType": "msg",
+        "rules": [{
+                "t": "true"
+            }
+        ],
+        "checkall": "true",
+        "repair": false,
+        "outputs": 1,
+        "x": 150,
+        "y": 280,
+        "wires": [["363bc492-e6a2-4afe-99fa-46b36d55e912"]]
+    }, {
+        "id": "654ae84a-89b8-444d-891a-d46e6e9d8c32",
+        "type": "switch",
+        "z": "507d49d0.5eaa08",
+        "name": "teams ?",
+        "property": "teams",
+        "propertyType": "msg",
+        "rules": [{
+                "t": "true"
+            }
+        ],
+        "checkall": "true",
+        "repair": false,
+        "outputs": 1,
+        "x": 160,
+        "y": 360,
+        "wires": [["585d4ac3-a45a-472a-8c0e-5d08c9239af1"]]
+    }, {
+        "id": "585d4ac3-a45a-472a-8c0e-5d08c9239af1",
+        "type": "delay",
+        "z": "507d49d0.5eaa08",
+        "name": "teams frequency",
+        "pauseType": "rate",
+        "timeout": "5",
+        "timeoutUnits": "seconds",
+        "rate": 0,
+        "nbRateUnits": 0,
+        "rateUnits": "hour",
+        "randomFirst": "1",
+        "randomLast": "5",
+        "randomUnits": "seconds",
+        "drop": true,
+        "x": 350,
+        "y": 360,
+        "wires": [["5191988e-c8e2-4e8a-a247-893aef3363db"]]
+    }, {
+        "id": "5191988e-c8e2-4e8a-a247-893aef3363db",
+        "type": "function",
+        "z": "507d49d0.5eaa08",
+        "name": "prepare Teams",
+        "func": "//init notification tab container\nvar template_items_tag = [];\ntemplate_items_tag[0] = {type: \"TextBlock\", id: \"data_collection\", text: \"_Data_collection_\",weight: \"Bolder\"};\nvar template_items_datetime= [];\ntemplate_items_datetime[0] = {type: \"TextBlock\", id: \"datetime_title\", text: \"_Datetime_\",weight: \"Bolder\"};\nvar template_items_status= [];\ntemplate_items_status[0] = {type: \"TextBlock\", id: \"status\", text: \"_Status_\",weight: \"Bolder\"};\n\n// get teams notification dictionnary and delete flow context\nvar teamsdico = flow.get(\"teamsDictio\") || {};\nflow.set(\"teamsDictio\",{});\n\n// loop into the teams notification dictionnary\nvar id_count = 1;   \nObject.keys(teamsdico).forEach((key, index) => {\n    // apply size limit parameter\n    if (teamsdico[key].length > msg.teams_limit)\n        teamsdico[key].splice(0, (teamsdico[key].length - msg.teams_limit));\n    // loop in each tag records\n    teamsdico[key].forEach(function(item) {\n        template_items_tag.push({type : \"TextBlock\" ,id : \"tag_\"+ id_count, text: key, horizontalAlignment: \"Center\"});\n        template_items_status.push({type : \"TextBlock\" ,id : \"status_\"+ id_count, text: `${item.status}`, horizontalAlignment: \"Center\"});\n        template_items_datetime.push({type : \"TextBlock\" ,id : \"datetime_\"+ id_count, text: `${item.datetime}`, horizontalAlignment: \"Center\"});\n        id_count ++;\n    });\n});\n// teams columns format\nvar template_columns = [];\ntemplate_columns[0] = {type: \"Column\",id: \"tag_column\",padding: \"Large\",width: \"auto\", items: template_items_tag, style: \"emphasis\", spacing: \"Medium\", separator: true, verticalContentAlignment: \"Center\"};\ntemplate_columns[1] = {type: \"Column\",id: \"status_column\",padding: \"Large\",width: \"auto\", items: template_items_status, style: \"emphasis\", spacing: \"Medium\", separator: true, verticalContentAlignment: \"Center\"};\ntemplate_columns[2] = {type: \"Column\",id: \"datetime_column\",padding: \"Large\",width: \"auto\", items: template_items_datetime, style: \"emphasis\", spacing: \"Medium\", separator: true, verticalContentAlignment: \"Center\"};\n// teams body format\nvar template_body = [];\ntemplate_body[0] = {type: \"TextBlock\",id: \"app_name\",text: \"MACHINE HEALTH MANAGEMENT\",wrap: true,size: \"ExtraLarge\",weight: \"Bolder\",color: \"Accent\",spacing: \"ExtraLarge\",isSubtle: true};\ntemplate_body[1] = {type: \"TextBlock\",id: \"notif_tittle\",text: \"Data Collection Status on machine \"+ msg.payload.message_machine, wrap: true,spacing: \"Large\",size: \"Medium\",isSubtle: true,color: \"Accent\"};\ntemplate_body[2] = {type: \"ColumnSet\",id: \"notif_tab\",columns: template_columns, padding: \"Large\", style: \"default\", horizontalAlignment: \"Center\", separator: true, spacing: \"Large\"};\ntemplate_body[3] = {type: \"TextBlock\",id: \"grafana_link\",text: \"More details in the [grafana dashboard](\"+msg.teams_grafana+\")\",wrap: true};\nvar template_content = {$schema: \"http://adaptivecards.io/schemas/adaptive-card.json\",type: \"AdaptiveCard\",version: \"1.2\",body: template_body,\"msteams\": {\"width\": \"Full\"},padding: \"None\"};\nvar template_attachments = [];\ntemplate_attachments[0] = {contentType: \"application/vnd.microsoft.card.adaptive\",contentUrl: null,content: template_content};\n//copy teams card into msg.payload\nmsg.payload = {type:\"message\",attachments: template_attachments};\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "x": 540,
+        "y": 360,
+        "wires": [["6946ca87-2deb-4ab0-a4aa-949b1605c446"]]
+    }, {
+        "id": "6946ca87-2deb-4ab0-a4aa-949b1605c446",
+        "type": "http request",
+        "z": "507d49d0.5eaa08",
+        "name": "notification Teams",
+        "method": "POST",
+        "ret": "txt",
+        "paytoqs": "ignore",
+        "url": "",
+        "tls": "",
+        "persist": false,
+        "proxy": "",
+        "authType": "",
+        "x": 750,
+        "y": 360,
+        "wires": [["5d001389-8c4c-495e-8f96-6233561e5a27"]]
+    }, {
+        "id": "5d001389-8c4c-495e-8f96-6233561e5a27",
+        "type": "function",
+        "z": "507d49d0.5eaa08",
+        "name": "Teams error ?",
+        "func": "if (msg.payload != \"1\"){\n    msg.payload = [{    \n        Message: msg.payload},\n        {\n            Class : \"Error\",\n            Source: msg.message_source,\n            Node: node.name,\n            Level: 10\n    }];\n    \n    \n    return msg;\n}\n",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "x": 940,
+        "y": 360,
+        "wires": [["f564341c-19a8-431b-881b-71866ae215a8"]]
+    }, {
+        "id": "39ede196-cc1f-4850-b8d3-86453652f9f5",
+        "type": "link in",
+        "z": "507d49d0.5eaa08",
+        "name": "",
+        "links": ["4cc636c4-7c04-427a-9c33-5bc685b0feed"],
+        "x": 35,
+        "y": 320,
+        "wires": [["4ecdc15c-5287-45d8-89f1-f9a563d78d60", "9e52cd7c-7690-45bc-9c94-e8f59f94c81f", "f7d7ef37-7893-4549-a306-6c92f30cda42", "be1b8665-762d-40b1-818b-ce8c5e706c0a", "654ae84a-89b8-444d-891a-d46e6e9d8c32"]]
+    }, {
+        "id": "4cc636c4-7c04-427a-9c33-5bc685b0feed",
+        "type": "link out",
+        "z": "507d49d0.5eaa08",
+        "name": "",
+        "links": ["24d9a14b.f7d9de"],
+        "x": 775,
+        "y": 240,
+        "wires": []
+    }, {
+        "id": "0939d034-7d51-4ede-a8dd-7b0ce37d976c",
+        "type": "function",
+        "z": "507d49d0.5eaa08",
+        "name": "notificationBuffer",
+        "func": "topic = msg.payload.message_source;\nif(msg.email){\n    var dico = flow.get(\"mailDictio\") || {};\n    const date = new Date();\n    message = '<th style=\"padding-top: 12px; padding-bottom: 12px; text-align: left; background-color: #f2f2f2; border: 1px solid #ddd; padding: 8px;\">The status of data collection ' + msg.payload.message_source + ' on the machine ' + msg.payload.message_machine + ' is ' + msg.payload.message_text + \" | date: \" + date.toLocaleString()+\"</th>\";\n    var buffer = dico[topic] || [];         //get the list [topic] from the dictionnary \n    buffer.push(message);\n    dico[topic] = buffer;                   //set the list [topic] with the new element\n    flow.set(\"mailDictio\",dico);             //save in the flow\n}\nif (msg.sms){\n    var smsDico = flow.get(\"smsDictio\") || {};\n    var smsCount = smsDico[topic] || 0;\n    smsCount = smsCount+1;  //increment to store how many messages from a certain topic you received\n    smsDico[topic]=smsCount;\n    flow.set(\"smsDictio\",smsDico);\n}\n\nif (msg.teams){\n    var teamsdico = flow.get(\"teamsDictio\") || {};\n    const date = new Date();\n    var teamssignal={status: msg.payload.message_text ,datetime: date.toLocaleString()};\n    var teamsbuffer = teamsdico[topic] || [];         //get the list [topic] from the dictionnary \n    teamsbuffer.push(teamssignal);\n    teamsdico[topic] = teamsbuffer;                   //set the list [topic] with the new element\n    flow.set(\"teamsDictio\",teamsdico);             //save in the flow\n}\n\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "x": 650,
+        "y": 240,
+        "wires": [["4cc636c4-7c04-427a-9c33-5bc685b0feed"]]
+    }, {
+        "id": "02575292-e9cb-411d-ac9a-36f5878be37b",
+        "type": "change",
+        "z": "507d49d0.5eaa08",
+        "name": "parameters_error",
+        "rules": [{
+                "t": "set",
+                "p": "message_plant",
+                "pt": "msg",
+                "to": "scomlt1000",
+                "tot": "str"
+            }, {
+                "t": "set",
+                "p": "message_machine",
+                "pt": "msg",
+                "to": "GEN_MACHINE",
+                "tot": "str"
+            }, {
+                "t": "set",
+                "p": "message_source",
+                "pt": "msg",
+                "to": "GEN_MACHINE_GEN_DEVICE_500",
+                "tot": "str"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 430,
+        "y": 140,
+        "wires": [["b5e65d00-a10b-4815-b313-7fd6168ae1bf"]]
+    }, {
+        "id": "fdd12163-a039-4a55-8f82-2ae4c642109a",
+        "type": "change",
+        "z": "507d49d0.5eaa08",
+        "name": "parameters_status",
+        "rules": [{
+                "t": "set",
+                "p": "message_plant",
+                "pt": "msg",
+                "to": "scomlt1000",
+                "tot": "str"
+            }, {
+                "t": "set",
+                "p": "message_machine",
+                "pt": "msg",
+                "to": "GEN_MACHINE",
+                "tot": "str"
+            }, {
+                "t": "set",
+                "p": "message_source",
+                "pt": "msg",
+                "to": "GEN_MACHINE_GEN_DEVICE_500_Read",
+                "tot": "str"
+            }, {
+                "t": "set",
+                "p": "sms",
+                "pt": "msg",
+                "to": "true",
+                "tot": "bool"
+            }, {
+                "t": "set",
+                "p": "sms_number",
+                "pt": "msg",
+                "to": "[\"+33663882761\"]",
+                "tot": "str"
+            }, {
+                "t": "set",
+                "p": "email",
+                "pt": "msg",
+                "to": "true",
+                "tot": "bool"
+            }, {
+                "t": "set",
+                "p": "email_address",
+                "pt": "msg",
+                "to": "wajdi.berriche_ext@plasticomnium.com",
+                "tot": "str"
+            }, {
+                "t": "set",
+                "p": "teams",
+                "pt": "msg",
+                "to": "false",
+                "tot": "bool"
+            }, {
+                "t": "set",
+                "p": "teams_limit",
+                "pt": "msg",
+                "to": "0",
+                "tot": "num"
+            }, {
+                "t": "set",
+                "p": "teams_grafana",
+                "pt": "msg",
+                "to": "https://scomlt1000.ad.ponet:3000/d/Ka81oy0Gk/mhm_graphs?orgId=1&var-Machine=MHM_GEN_MACHINE&var-Module=All&var-Type=All&var-Custom=All&var-Tags=All&var-Scale=$__auto_interval_Scale",
+                "tot": "str"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 430,
+        "y": 180,
+        "wires": [["6ddacefa-93be-43f0-a6f6-47132f53b650"]]
+    }, {
+        "id": "2d92c1af-5d8a-41ef-a2b7-1e052a35f1d3",
+        "type": "change",
+        "z": "507d49d0.5eaa08",
+        "name": "parameters",
+        "rules": [{
+                "t": "set",
+                "p": "params",
+                "pt": "msg",
+                "to": "{ \"scaling_values\":{\"PlcHmi_actualSpeed\":1.0,\"PlcHmi_SM1281_opMode\":10.0,\"SM1281_CH1_vRMS\":1.0,\"OP_Card\":20.0}, \"write_to_db\": {\"PlcHmi_actualSpeed\":1,\"PlcHmi_SM1281_opMode\":1,\"SM1281_CH1_vRMS\":1,\"OP_Card\":1},\"TagTable\":{\"Name\":{\"PlcHmi_actualSpeed\":\"PlcHmi_actualSpeed\",\"PlcHmi_SM1281_opMode\":\"PlcHmi_SM1281_opMode\",\"SM1281_CH1_vRMS\":\"SM1281_CH1_vRMS\",\"OP_Card\":\"OP_Card\"},\"Type\":{\"PlcHmi_actualSpeed\":\"calculated\",\"PlcHmi_SM1281_opMode\":\"status\",\"SM1281_CH1_vRMS\":\"vibration\",\"OP_Card\":\"string\"},\"Module\":{\"PlcHmi_actualSpeed\":\"S90\",\"PlcHmi_SM1281_opMode\":\"SM1281\",\"SM1281_CH1_vRMS\":\"SM1281\",\"OP_Card\":\"OP30\"},\"Custom\":{\"PlcHmi_actualSpeed\":\"MOTOR\",\"PlcHmi_SM1281_opMode\":\"VIBRATION\",\"SM1281_CH1_vRMS\":\"CH1\",\"OP_Card\":\"OP_Card_Cust\"}}}",
+                "tot": "json"
+            }, {
+                "t": "set",
+                "p": "machine",
+                "pt": "msg",
+                "to": "MHM_GEN_MACHINE",
+                "tot": "str"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 350,
+        "y": 60,
+        "wires": [["64ae8ade-496d-4558-9699-ea9390e90408"]]
+    }, {
+        "id": "f2ad0711-3709-4990-a9ba-1b69c5fd2b4c",
+        "type": "s7 endpoint",
+        "z": "507d49d0.5eaa08",
+        "transport": "iso-on-tcp",
+        "address": "192.168.52.100",
+        "port": "102",
+        "rack": "0",
+        "slot": "1",
+        "localtsaphi": "01",
+        "localtsaplo": "00",
+        "remotetsaphi": "01",
+        "remotetsaplo": "00",
+        "connmode": "rack-slot",
+        "adapterauto": true,
+        "adapterport": "",
+        "busaddr": "2",
+        "adapteraddr": "0",
+        "cycletime": "500",
+        "timeout": "1500",
+        "verbose": "off",
+        "name": "GEN_MACHINE_GEN_DEVICE_500",
+        "vartable": [{
+                "addr": "DB1,R6",
+                "name": "PlcHmi_actualSpeed"
+            }, {
+                "addr": "DB1,I21",
+                "name": "PlcHmi_SM1281_opMode"
+            }, {
+                "addr": "DB1,R246",
+                "name": "SM1281_CH1_vRMS"
+            }, {
+                "addr": "DB1,S46.2",
+                "name": "OP_Card"
+            }
+        ]
+    }, {
+        "id": "4aea4161-3e40-4ec2-a883-312617e48f75",
+        "type": "influxdb",
+        "z": "507d49d0.5eaa08",
+        "hostname": "127.0.0.1",
+        "port": "8086",
+        "protocol": "http",
+        "database": "MHM_GEN_MACHINE",
+        "name": "MHM_GEN_MACHINE",
+        "usetls": true,
+        "tls": "ef39b40c.ed7218",
+        "influxdbVersion": "1.x",
+        "url": "https://127.0.0.1:8086"
+    }, {
+        "id": "ef39b40c.ed7218",
+        "type": "tls-config",
+        "z": "",
+        "name": "",
+        "cert": "",
+        "key": "",
+        "ca": "",
+        "certname": "",
+        "keyname": "",
+        "caname": "",
+        "servername": "",
+        "verifyservercert": false
+    }
+]
